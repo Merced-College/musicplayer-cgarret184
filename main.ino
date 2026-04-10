@@ -1,8 +1,8 @@
 #include "AudioPlayer.h"
 #include "Playlist.h"
 
-// String array to store song names
-String songs[] = {
+// Song titles stored as flash-friendly C strings
+const char* songs[] = {
     "Forest Morning",
     "River Walk",
     "City Lights",
@@ -210,10 +210,11 @@ void printPlaylist() {
         if (track->getTrackNumber() < 10) Serial.print(" ");
         Serial.print(" │ ");
         
-        String title = track->getTitle();
-        if (title.length() <= 22) {
+        const char* title = track->getTitle();
+        size_t titleLen = strlen(title);
+        if (titleLen <= 22) {
             Serial.print(title);
-            for (int j = title.length(); j < 22; j++) Serial.print(" ");
+            for (int j = titleLen; j < 22; j++) Serial.print(" ");
         } else {
             for (int k = 0; k < 19; k++) Serial.print(title[k]);
             Serial.print("...");
@@ -231,7 +232,7 @@ void printPlaylist() {
 
 // Demonstration of linear search by title
 void linearSearchDemo(String title) {
-    int index = playlist.linearSearchByTitle(title);
+    int index = playlist.linearSearchByTitle(title.c_str());
     Serial.print("Searching for: \"");
     Serial.print(title);
     Serial.print("\" -> ");
@@ -275,7 +276,7 @@ void sortByTrackNumberDemo() {
 
 // Linear search to find a song by name
 void findSong(String songName) {
-    int index = playlist.linearSearchByTitle(songName);
+    int index = playlist.linearSearchByTitle(songName.c_str());
     if (index != -1) {
         AudioTrack* track = playlist.getTrack(index);
         if (track != nullptr) {

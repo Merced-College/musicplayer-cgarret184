@@ -68,13 +68,22 @@ AudioTrack* Playlist::getTrack(uint8_t index) {
     return &tracks[index];
 }
 
+static bool equalsIgnoreCase(const char* a, const char* b) {
+    while (*a && *b) {
+        char ca = *a;
+        char cb = *b;
+        if (ca >= 'A' && ca <= 'Z') ca += 'a' - 'A';
+        if (cb >= 'A' && cb <= 'Z') cb += 'a' - 'A';
+        if (ca != cb) return false;
+        a++; b++;
+    }
+    return *a == *b;
+}
+
 // Linear search by title - returns index if found, -1 if not found
-int Playlist::linearSearchByTitle(String title) {
-    title.toLowerCase();
+int Playlist::linearSearchByTitle(const char* title) {
     for (int i = 0; i < trackCount; i++) {
-        String trackTitle = tracks[i].getTitle();
-        trackTitle.toLowerCase();
-        if (trackTitle == title) {
+        if (equalsIgnoreCase(tracks[i].getTitle(), title)) {
             return i;
         }
     }
@@ -97,7 +106,7 @@ void Playlist::sortByTitle() {
         int minIndex = i;
         
         for (int j = i + 1; j < trackCount; j++) {
-            if (tracks[j].getTitle() < tracks[minIndex].getTitle()) {
+            if (strcmp(tracks[j].getTitle(), tracks[minIndex].getTitle()) < 0) {
                 minIndex = j;
             }
         }

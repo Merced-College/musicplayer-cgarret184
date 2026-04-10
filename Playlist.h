@@ -4,7 +4,7 @@
 #include <Arduino.h>
 #include "AudioTrack.h"
 
-#define MAX_TRACKS 50
+#define MAX_TRACKS 8
 
 // This class manages a list of audio tracks for a music player.
 // It can add tracks, navigate through them, and sort or search the list.
@@ -42,7 +42,7 @@ public:
     AudioTrack* getTrack(uint8_t index);
 
     // Linear search
-    int linearSearchByTitle(String title);
+    int linearSearchByTitle(const char* title);
     int linearSearchByTrackNumber(uint16_t trackNumber);
 
     // Selection sort

@@ -8,7 +8,7 @@ AudioTrack::AudioTrack() {
 }
 
 // Constructor with parameters: Creates a track with given number, title, and duration
-AudioTrack::AudioTrack(uint16_t number, String name, uint16_t durationSec) {
+AudioTrack::AudioTrack(uint16_t number, const char* name, uint16_t durationSec) {
     trackNumber = number;
     title = name;
     duration = durationSec;
@@ -20,7 +20,7 @@ uint16_t AudioTrack::getTrackNumber() {
 }
 
 // Returns the track's title
-String AudioTrack::getTitle() {
+const char* AudioTrack::getTitle() {
     return title;
 }
 
