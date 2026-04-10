@@ -19,16 +19,49 @@ SoftwareSerial dfSerial(10, 11); // RX, TX pins for DFPlayer Mini
 AudioPlayer player(&dfSerial);
 Playlist playlist;
 
+void trimCharArray(char* str) {
+    int start = 0;
+    int end = strlen(str) - 1;
+
+    while (str[start] != '\0' && (str[start] == ' ' || str[start] == '\t' || str[start] == '\r' || str[start] == '\n')) {
+        start++;
+    }
+
+    while (end >= start && (str[end] == ' ' || str[end] == '\t' || str[end] == '\r' || str[end] == '\n')) {
+        end--;
+    }
+
+    int len = end - start + 1;
+    if (len <= 0) {
+        str[0] = '\0';
+        return;
+    }
+
+    if (start > 0) {
+        memmove(str, str + start, len);
+    }
+    str[len] = '\0';
+}
+
+void toLowerCase(char* str) {
+    while (*str) {
+        if (*str >= 'A' && *str <= 'Z') {
+            *str += 'a' - 'A';
+        }
+        str++;
+    }
+}
+
 void setup() {
     Serial.begin(9600);
     delay(500);
 
     // Initialize audio player
     if (!player.begin()) {
-        Serial.println("ERROR: Failed to initialize DFPlayer Mini");
+        Serial.println(F("ERROR: Failed to initialize DFPlayer Mini"));
         while (1);
     }
-    Serial.println("DFPlayer Mini initialized successfully");
+    Serial.println(F("DFPlayer Mini initialized successfully"));
 
     // Create playlist with 8 songs from the songs array
     playlist.addTrack(AudioTrack(1, songs[0], 245));
@@ -40,23 +73,23 @@ void setup() {
     playlist.addTrack(AudioTrack(7, songs[6], 214));
     playlist.addTrack(AudioTrack(8, songs[7], 251));
 
-    Serial.println("\n=== ORIGINAL PLAYLIST ===");
+    Serial.println(F("\n=== ORIGINAL PLAYLIST ==="));
     printPlaylist();
 
     // Demonstrate linear search by title
-    Serial.println("\n=== LINEAR SEARCH BY TITLE ===");
+    Serial.println(F("\n=== LINEAR SEARCH BY TITLE ==="));
     linearSearchDemo("Forest Morning");
     linearSearchDemo("Ocean Waves");
     linearSearchDemo("Mountain Echo");
 
     // Demonstrate linear search by track number
-    Serial.println("\n=== LINEAR SEARCH BY TRACK NUMBER ===");
+    Serial.println(F("\n=== LINEAR SEARCH BY TRACK NUMBER ==="));
     trackNumberSearchDemo(5);
     trackNumberSearchDemo(8);
     trackNumberSearchDemo(10);
 
     // Create a copy for sorting by title
-    Serial.println("\n=== SORTING BY TITLE (A-Z) ===");
+    Serial.println(F("\n=== SORTING BY TITLE (A-Z) ==="));
     sortByTitleDemo();
 
     // Re-create playlist for sorting by track number
@@ -70,10 +103,10 @@ void setup() {
     playlist.addTrack(AudioTrack(7, songs[6], 214));
     playlist.addTrack(AudioTrack(8, songs[7], 251));
 
-    Serial.println("\n=== SORTING BY TRACK NUMBER ===");
+    Serial.println(F("\n=== SORTING BY TRACK NUMBER ==="));
     sortByTrackNumberDemo();
 
-    Serial.println("\n=== SETUP COMPLETE ===");
+    Serial.println(F("\n=== SETUP COMPLETE ==="));
     delay(500);
     printMenu();
 }
@@ -81,241 +114,250 @@ void setup() {
 void loop() {
     // Main loop for Serial menu control
     if (Serial.available()) {
-        String rawInput = Serial.readStringUntil('\n');
-        rawInput.trim();
+        char rawInput[48];
+        char command[12] = "";
+        char argument[32] = "";
+        size_t len = Serial.readBytesUntil('\n', rawInput, sizeof(rawInput) - 1);
+        rawInput[len] = '\0';
+        trimCharArray(rawInput);
 
-        // Parse command, but keep arguments in their original case for search
-        int spaceIndex = rawInput.indexOf(' ');
-        String command = (spaceIndex > 0) ? rawInput.substring(0, spaceIndex) : rawInput;
-        String argument = (spaceIndex > 0) ? rawInput.substring(spaceIndex + 1) : "";
-        command.toLowerCase();
-        
+        char* spacePos = strchr(rawInput, ' ');
+        if (spacePos != nullptr) {
+            *spacePos = '\0';
+            strncpy(argument, spacePos + 1, sizeof(argument) - 1);
+            argument[sizeof(argument) - 1] = '\0';
+            trimCharArray(argument);
+        }
+
+        strncpy(command, rawInput, sizeof(command) - 1);
+        command[sizeof(command) - 1] = '\0';
+        toLowerCase(command);
+
         // Handle commands
-        if (command == "p") {
+        if (strcmp(command, "p") == 0) {
             // Play track by number: p <number>
-            if (argument.length() > 0) {
-                int trackNum = argument.toInt();
+            if (argument[0] != '\0') {
+                int trackNum = atoi(argument);
                 if (trackNum > 0 && trackNum <= NUM_SONGS) {
                     if (playlist.setCurrentTrackByNumber(trackNum)) {
                         player.playTrack(trackNum);
-                        Serial.print("Playing: ");
+                        Serial.print(F("Playing: "));
                         Serial.println(songs[trackNum - 1]);
                     } else {
-                        Serial.println("ERROR: Track not found in playlist");
+                        Serial.println(F("ERROR: Track not found in playlist"));
                     }
                 } else {
-                    Serial.println("ERROR: Track number must be between 1 and ");
+                    Serial.print(F("ERROR: Track number must be between 1 and "));
                     Serial.println(NUM_SONGS);
                 }
             } else {
-                Serial.println("ERROR: Usage: p <number>");
+                Serial.println(F("ERROR: Usage: p <number>"));
             }
         }
-        else if (command == "n" || command == "next") {
+        else if (strcmp(command, "n") == 0 || strcmp(command, "next") == 0) {
             // Next track based on playlist order
             AudioTrack* nextTrack = playlist.nextTrack();
             if (nextTrack) {
                 player.playTrack(nextTrack->getTrackNumber());
             } else {
-                Serial.println("ERROR: Playlist is empty");
+                Serial.println(F("ERROR: Playlist is empty"));
             }
         }
-        else if (command == "b" || command == "prev" || command == "previous") {
+        else if (strcmp(command, "b") == 0 || strcmp(command, "prev") == 0 || strcmp(command, "previous") == 0) {
             // Previous track based on playlist order
             AudioTrack* previousTrack = playlist.previousTrack();
             if (previousTrack) {
                 player.playTrack(previousTrack->getTrackNumber());
             } else {
-                Serial.println("ERROR: Playlist is empty");
+                Serial.println(F("ERROR: Playlist is empty"));
             }
         }
-        else if (command == "pause") {
+        else if (strcmp(command, "pause") == 0) {
             // Pause playback
             player.pause();
         }
-        else if (command == "stop") {
+        else if (strcmp(command, "stop") == 0) {
             // Stop playback
             player.stop();
         }
-        else if (command == "v") {
+        else if (strcmp(command, "v") == 0) {
             // Set volume: v <number>
-            if (argument.length() > 0) {
-                int volLevel = argument.toInt();
+            if (argument[0] != '\0') {
+                int volLevel = atoi(argument);
                 player.setVolume(volLevel);
             } else {
-                Serial.println("ERROR: Usage: v <number> (0-30)");
+                Serial.println(F("ERROR: Usage: v <number> (0-30)"));
             }
         }
-        else if (command == "list") {
+        else if (strcmp(command, "list") == 0) {
             // Show playlist
-            Serial.println("\n=== PLAYLIST ===");
+            Serial.println(F("\n=== PLAYLIST ==="));
             printPlaylist();
         }
-        else if (command == "find") {
+        else if (strcmp(command, "find") == 0) {
             // Find song: find <word>
-            if (argument.length() > 0) {
+            if (argument[0] != '\0') {
                 findSong(argument);
             } else {
-                Serial.println("ERROR: Usage: find <song name>");
+                Serial.println(F("ERROR: Usage: find <song name>"));
             }
         }
-        else if (command == "sort") {
+        else if (strcmp(command, "sort") == 0) {
             // Sort playlist
-            if (argument.length() > 0) {
-                String sortArg = argument;
-                sortArg.toLowerCase();
-                if (sortArg == "title" || sortArg == "name") {
-                    Serial.println("Sorting playlist by title...");
+            if (argument[0] != '\0') {
+                toLowerCase(argument);
+                if (strcmp(argument, "title") == 0 || strcmp(argument, "name") == 0) {
+                    Serial.println(F("Sorting playlist by title..."));
                     playlist.sortByTitle();
-                    Serial.println("Done!");
+                    Serial.println(F("Done!"));
                     printPlaylist();
-                } else if (sortArg == "track" || sortArg == "number") {
-                    Serial.println("Sorting playlist by track number...");
+                } else if (strcmp(argument, "track") == 0 || strcmp(argument, "number") == 0) {
+                    Serial.println(F("Sorting playlist by track number..."));
                     playlist.sortByTrackNumber();
-                    Serial.println("Done!");
+                    Serial.println(F("Done!"));
                     printPlaylist();
                 } else {
-                    Serial.println("ERROR: Usage: sort <title|track>");
+                    Serial.println(F("ERROR: Usage: sort <title|track>"));
                 }
             } else {
-                Serial.println("ERROR: Usage: sort <title|track>");
+                Serial.println(F("ERROR: Usage: sort <title|track>"));
             }
         }
-        else if (command == "help") {
+        else if (strcmp(command, "help") == 0) {
             // Show help menu
             printMenu();
         }
-        else if (command == "r" || command == "resume") {
+        else if (strcmp(command, "r") == 0 || strcmp(command, "resume") == 0) {
             // Resume from pause (legacy support)
             player.resume();
         }
-        else if (rawInput.length() > 0) {
+        else if (rawInput[0] != '\0') {
             // Invalid command
-            Serial.print("ERROR: Unknown command '");
+            Serial.print(F("ERROR: Unknown command '"));
             Serial.print(rawInput);
-            Serial.println("' - Type 'help' for menu");
+            Serial.println(F("' - Type 'help' for menu"));
         }
     }
 }
 
 // Helper function to print the entire playlist
 void printPlaylist() {
-    Serial.println("┌─────────────────────────────────────┐");
-    Serial.println("│ #  │ Song Name              │ Length │");
-    Serial.println("├─────────────────────────────────────┤");
+    Serial.println(F("┌─────────────────────────────────────┐"));
+    Serial.println(F("│ #  │ Song Name              │ Length │"));
+    Serial.println(F("├─────────────────────────────────────┤"));
     for (uint8_t i = 0; i < playlist.getTrackCount(); i++) {
         AudioTrack* track = playlist.getTrack(i);
-        Serial.print("│ ");
+        Serial.print(F("│ "));
         Serial.print(track->getTrackNumber());
-        if (track->getTrackNumber() < 10) Serial.print(" ");
-        Serial.print(" │ ");
+        if (track->getTrackNumber() < 10) Serial.print(F(" "));
+        Serial.print(F(" │ "));
         
         const char* title = track->getTitle();
         size_t titleLen = strlen(title);
         if (titleLen <= 22) {
             Serial.print(title);
-            for (int j = titleLen; j < 22; j++) Serial.print(" ");
+            for (int j = titleLen; j < 22; j++) Serial.print(F(" "));
         } else {
             for (int k = 0; k < 19; k++) Serial.print(title[k]);
-            Serial.print("...");
+            Serial.print(F("..."));
         }
         
-        Serial.print(" │ ");
+        Serial.print(F(" │ "));
         uint16_t dur = track->getDuration();
-        if (dur < 100) Serial.print("0");
-        if (dur < 10) Serial.print("0");
+        if (dur < 100) Serial.print(F("0"));
+        if (dur < 10) Serial.print(F("0"));
         Serial.print(dur);
-        Serial.println("s │");
+        Serial.println(F("s │"));
     }
-    Serial.println("└─────────────────────────────────────┘\n");
+    Serial.println(F("└─────────────────────────────────────┘\n"));
 }
 
 // Demonstration of linear search by title
-void linearSearchDemo(String title) {
-    int index = playlist.linearSearchByTitle(title.c_str());
-    Serial.print("Searching for: \"");
+void linearSearchDemo(const char* title) {
+    int index = playlist.linearSearchByTitle(title);
+    Serial.print(F("Searching for: \""));
     Serial.print(title);
-    Serial.print("\" -> ");
+    Serial.print(F("\" -> "));
     
     if (index != -1) {
-        Serial.print("Found at index ");
+        Serial.print(F("Found at index "));
         Serial.println(index);
     } else {
-        Serial.println("NOT FOUND");
+        Serial.println(F("NOT FOUND"));
     }
 }
 
 // Demonstration of linear search by track number
 void trackNumberSearchDemo(uint16_t trackNum) {
     int index = playlist.linearSearchByTrackNumber(trackNum);
-    Serial.print("Searching for track #");
+    Serial.print(F("Searching for track #"));
     Serial.print(trackNum);
-    Serial.print(" -> ");
+    Serial.print(F(" -> "));
     
     if (index != -1) {
-        Serial.print("Found at index ");
+        Serial.print(F("Found at index "));
         Serial.println(index);
     } else {
-        Serial.println("NOT FOUND");
+        Serial.println(F("NOT FOUND"));
     }
 }
 
 // Demonstration of sorting by title
 void sortByTitleDemo() {
     playlist.sortByTitle();
-    Serial.println("Playlist sorted by title:");
+    Serial.println(F("Playlist sorted by title:"));
     printPlaylist();
 }
 
 // Demonstration of sorting by track number
 void sortByTrackNumberDemo() {
     playlist.sortByTrackNumber();
-    Serial.println("Playlist sorted by track number:");
+    Serial.println(F("Playlist sorted by track number:"));
     printPlaylist();
 }
 
 // Linear search to find a song by name
-void findSong(String songName) {
-    int index = playlist.linearSearchByTitle(songName.c_str());
+void findSong(const char* songName) {
+    int index = playlist.linearSearchByTitle(songName);
     if (index != -1) {
         AudioTrack* track = playlist.getTrack(index);
         if (track != nullptr) {
-            Serial.print("Song found: ");
+            Serial.print(F("Song found: "));
             Serial.println(track->getTitle());
-            Serial.print("Track number: ");
+            Serial.print(F("Track number: "));
             Serial.println(track->getTrackNumber());
             return;
         }
     }
 
     // Song not found
-    Serial.println("Song not found");
+    Serial.println(F("Song not found"));
 }
 
 // Print available commands menu
 void printMenu() {
-    Serial.println("\n╔════════════════════════════════════════╗");
-    Serial.println("║     MUSIC PLAYER - COMMAND MENU        ║");
-    Serial.println("╚════════════════════════════════════════╝");
-    Serial.println("\nPLAYBACK CONTROL:");
-    Serial.println("  p <number>      Play track (1-8)");
-    Serial.println("  n               Next track");
-    Serial.println("  b               Previous track");
-    Serial.println("  pause           Pause playback");
-    Serial.println("  stop            Stop playback");
-    Serial.println("  r               Resume from pause");
-    Serial.println("\nVOLUME CONTROL:");
-    Serial.println("  v <number>      Set volume (0-30)");
-    Serial.println("\nPLAYLIST MANAGEMENT:");
-    Serial.println("  list            Show playlist");
-    Serial.println("  find <word>     Find song by name");
-    Serial.println("  sort <type>     Sort playlist (title|track)");
-    Serial.println("\nOTHER:");
-    Serial.println("  help            Show this menu");
-    Serial.println("\nEXAMPLES:");
-    Serial.println("  p 3             → Play track 3");
-    Serial.println("  v 25            → Set volume to 25");
-    Serial.println("  find Rainfall   → Search for 'Rainfall'");
-    Serial.println("  sort title      → Sort by song title");
-    Serial.println("════════════════════════════════════════\n");
+    Serial.println(F("\n╔════════════════════════════════════════╗"));
+    Serial.println(F("║     MUSIC PLAYER - COMMAND MENU        ║"));
+    Serial.println(F("╚════════════════════════════════════════╝"));
+    Serial.println(F("\nPLAYBACK CONTROL:"));
+    Serial.println(F("  p <number>      Play track (1-8)"));
+    Serial.println(F("  n               Next track"));
+    Serial.println(F("  b               Previous track"));
+    Serial.println(F("  pause           Pause playback"));
+    Serial.println(F("  stop            Stop playback"));
+    Serial.println(F("  r               Resume from pause"));
+    Serial.println(F("\nVOLUME CONTROL:"));
+    Serial.println(F("  v <number>      Set volume (0-30)"));
+    Serial.println(F("\nPLAYLIST MANAGEMENT:"));
+    Serial.println(F("  list            Show playlist"));
+    Serial.println(F("  find <word>     Find song by name"));
+    Serial.println(F("  sort <type>     Sort playlist (title|track)"));
+    Serial.println(F("\nOTHER:"));
+    Serial.println(F("  help            Show this menu"));
+    Serial.println(F("\nEXAMPLES:"));
+    Serial.println(F("  p 3             → Play track 3"));
+    Serial.println(F("  v 25            → Set volume to 25"));
+    Serial.println(F("  find Rainfall   → Search for 'Rainfall'"));
+    Serial.println(F("  sort title      → Sort by song title"));
+    Serial.println(F("════════════════════════════════════════\n"));
 }
