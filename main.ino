@@ -81,38 +81,53 @@ void setup() {
 void loop() {
     // Main loop for Serial menu control
     if (Serial.available()) {
-        String input = Serial.readStringUntil('\n');
-        input.trim();
-        input.toLowerCase();
-        
-        // Parse command
-        int spaceIndex = input.indexOf(' ');
-        String command = (spaceIndex > 0) ? input.substring(0, spaceIndex) : input;
-        String argument = (spaceIndex > 0) ? input.substring(spaceIndex + 1) : "";
+        String rawInput = Serial.readStringUntil('\n');
+        rawInput.trim();
+
+        // Parse command, but keep arguments in their original case for search
+        int spaceIndex = rawInput.indexOf(' ');
+        String command = (spaceIndex > 0) ? rawInput.substring(0, spaceIndex) : rawInput;
+        String argument = (spaceIndex > 0) ? rawInput.substring(spaceIndex + 1) : "";
+        command.toLowerCase();
         
         // Handle commands
         if (command == "p") {
             // Play track by number: p <number>
             if (argument.length() > 0) {
                 int trackNum = argument.toInt();
-                if (trackNum > 0 && trackNum <= 8) {
-                    player.playTrack(trackNum);
-                    Serial.print("Playing: ");
-                    Serial.println(songs[trackNum - 1]);
+                if (trackNum > 0 && trackNum <= NUM_SONGS) {
+                    if (playlist.setCurrentTrackByNumber(trackNum)) {
+                        player.playTrack(trackNum);
+                        Serial.print("Playing: ");
+                        Serial.println(songs[trackNum - 1]);
+                    } else {
+                        Serial.println("ERROR: Track not found in playlist");
+                    }
                 } else {
-                    Serial.println("ERROR: Track number must be between 1 and 8");
+                    Serial.println("ERROR: Track number must be between 1 and ");
+                    Serial.println(NUM_SONGS);
                 }
             } else {
                 Serial.println("ERROR: Usage: p <number>");
             }
         }
         else if (command == "n" || command == "next") {
-            // Next track
-            player.nextTrack();
+            // Next track based on playlist order
+            AudioTrack* nextTrack = playlist.nextTrack();
+            if (nextTrack) {
+                player.playTrack(nextTrack->getTrackNumber());
+            } else {
+                Serial.println("ERROR: Playlist is empty");
+            }
         }
         else if (command == "b" || command == "prev" || command == "previous") {
-            // Previous track
-            player.previousTrack();
+            // Previous track based on playlist order
+            AudioTrack* previousTrack = playlist.previousTrack();
+            if (previousTrack) {
+                player.playTrack(previousTrack->getTrackNumber());
+            } else {
+                Serial.println("ERROR: Playlist is empty");
+            }
         }
         else if (command == "pause") {
             // Pause playback
@@ -147,12 +162,14 @@ void loop() {
         else if (command == "sort") {
             // Sort playlist
             if (argument.length() > 0) {
-                if (argument == "title" || argument == "name") {
+                String sortArg = argument;
+                sortArg.toLowerCase();
+                if (sortArg == "title" || sortArg == "name") {
                     Serial.println("Sorting playlist by title...");
                     playlist.sortByTitle();
                     Serial.println("Done!");
                     printPlaylist();
-                } else if (argument == "track" || argument == "number") {
+                } else if (sortArg == "track" || sortArg == "number") {
                     Serial.println("Sorting playlist by track number...");
                     playlist.sortByTrackNumber();
                     Serial.println("Done!");
@@ -172,10 +189,10 @@ void loop() {
             // Resume from pause (legacy support)
             player.resume();
         }
-        else if (input.length() > 0) {
+        else if (rawInput.length() > 0) {
             // Invalid command
             Serial.print("ERROR: Unknown command '");
-            Serial.print(input);
+            Serial.print(rawInput);
             Serial.println("' - Type 'help' for menu");
         }
     }
@@ -258,17 +275,18 @@ void sortByTrackNumberDemo() {
 
 // Linear search to find a song by name
 void findSong(String songName) {
-    // Linear search through songs array
-    for (int i = 0; i < NUM_SONGS; i++) {
-        if (songs[i] == songName) {
+    int index = playlist.linearSearchByTitle(songName);
+    if (index != -1) {
+        AudioTrack* track = playlist.getTrack(index);
+        if (track != nullptr) {
             Serial.print("Song found: ");
-            Serial.println(songs[i]);
+            Serial.println(track->getTitle());
             Serial.print("Track number: ");
-            Serial.println(i + 1);
+            Serial.println(track->getTrackNumber());
             return;
         }
     }
-    
+
     // Song not found
     Serial.println("Song not found");
 }

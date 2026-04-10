@@ -25,6 +25,8 @@ public:
     bool addTrack(AudioTrack track);
     // Gets the track that's currently selected
     AudioTrack* getCurrentTrack();
+    // Selects a track by its track number and makes it current
+    bool setCurrentTrackByNumber(uint16_t trackNumber);
 
     // Moves to the next track in the list
     AudioTrack* nextTrack();

@@ -51,6 +51,17 @@ void Playlist::reset() {
     currentIndex = 0;
 }
 
+// Selects the current track by its track number.
+// Returns true if the track exists and the current index was updated.
+bool Playlist::setCurrentTrackByNumber(uint16_t trackNumber) {
+    int index = linearSearchByTrackNumber(trackNumber);
+    if (index >= 0) {
+        currentIndex = index;
+        return true;
+    }
+    return false;
+}
+
 // Get track at specific index
 AudioTrack* Playlist::getTrack(uint8_t index) {
     if (index >= trackCount) return nullptr;
@@ -59,8 +70,11 @@ AudioTrack* Playlist::getTrack(uint8_t index) {
 
 // Linear search by title - returns index if found, -1 if not found
 int Playlist::linearSearchByTitle(String title) {
+    title.toLowerCase();
     for (int i = 0; i < trackCount; i++) {
-        if (tracks[i].getTitle() == title) {
+        String trackTitle = tracks[i].getTitle();
+        trackTitle.toLowerCase();
+        if (trackTitle == title) {
             return i;
         }
     }
